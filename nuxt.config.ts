@@ -30,6 +30,8 @@ export default defineNuxtConfig({
       // Re-exposición tipada de las envs de Supabase para casos donde no se use el módulo
       supabaseUrl: process.env.SUPABASE_URL,
       supabaseKey: process.env.SUPABASE_KEY,
+      // PIN de acceso (vacío = sin gate). NO es seguridad real, solo barrera UX.
+      appPin: process.env.NUXT_PUBLIC_APP_PIN ?? '',
     },
   },
 

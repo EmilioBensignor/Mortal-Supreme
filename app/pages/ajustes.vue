@@ -1,8 +1,16 @@
 <script setup>
 const online = useOnline()
 const { installed, platform, canPromptInstall, promptInstall } = useInstallPwa()
+const config = useRuntimeConfig()
+const hasPin = !!config.public.appPin
 
 const showInstall = ref(false)
+
+function lock() {
+  if (typeof window === 'undefined') return
+  window.localStorage.removeItem('app-pin')
+  navigateTo('/unlock')
+}
 
 async function handleInstall() {
   if (canPromptInstall.value) {
@@ -70,6 +78,23 @@ const platformLabel = computed(() => {
         <span class="text-pingpong-300 text-xs">Plataforma detectada</span>
         <span class="font-mono-num text-pingpong-100 text-xs font-semibold">{{ platformLabel }}</span>
       </div>
+    </section>
+
+    <!-- Seguridad (solo si hay PIN) -->
+    <section v-if="hasPin" class="flex flex-col gap-2">
+      <h2 class="text-pingpong-200 text-xs font-semibold uppercase tracking-wider">Seguridad</h2>
+      <button
+        type="button"
+        class="flex items-center gap-3 bg-pingpong-900/40 active:bg-pingpong-700/60 rounded-2xl border border-solid border-pingpong-700/30 transition-colors text-left px-4 py-3"
+        @click="lock"
+      >
+        <UIcon name="i-lucide-lock" class="size-5 text-pingpong-300 shrink-0" />
+        <div class="flex flex-col gap-0.5 flex-1 min-w-0">
+          <p class="text-light text-sm font-semibold">Bloquear app</p>
+          <p class="text-pingpong-300 text-xs">Pedirá el PIN al volver</p>
+        </div>
+        <UIcon name="i-lucide-chevron-right" class="size-4 text-pingpong-400 shrink-0" />
+      </button>
     </section>
 
     <!-- Info -->
