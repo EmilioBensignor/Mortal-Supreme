@@ -1,0 +1,146 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+/* Paleta Mortal Supreme — azul mesa de torneo + naranja pelotita */
+@theme static {
+  /* Azul ping pong (mesa ITTF) — primario */
+  --color-pingpong-50: #eff5ff;
+  --color-pingpong-100: #dbe8ff;
+  --color-pingpong-200: #bfd4ff;
+  --color-pingpong-300: #93b6ff;
+  --color-pingpong-400: #608dff;
+  --color-pingpong-500: #3a66ff;
+  --color-pingpong-600: #0b5fff;
+  --color-pingpong-700: #0a44b8;
+  --color-pingpong-800: #0e3a8a;
+  --color-pingpong-900: #122f66;
+  --color-pingpong-950: #06122b;
+
+  /* Naranja pelotita — acento */
+  --color-pelota-50: #fff8ed;
+  --color-pelota-100: #ffefd2;
+  --color-pelota-200: #ffdba4;
+  --color-pelota-300: #ffbe6b;
+  --color-pelota-400: #ff9333;
+  --color-pelota-500: #ff7a0a;
+  --color-pelota-600: #f05c00;
+  --color-pelota-700: #c74704;
+  --color-pelota-800: #9d390c;
+  --color-pelota-900: #7e310e;
+
+  /* Neutral azul oscuro — usado por Nuxt UI para cards/inputs/borders */
+  --color-deep-50: #eef3ff;
+  --color-deep-100: #dde7fb;
+  --color-deep-200: #b8c8e8;
+  --color-deep-300: #8da7d4;
+  --color-deep-400: #5d7ab1;
+  --color-deep-500: #3f5b94;
+  --color-deep-600: #1f3973;
+  --color-deep-700: #16295a;
+  --color-deep-800: #0d1b40;
+  --color-deep-900: #0a1530;
+  --color-deep-950: #06112a;
+}
+
+:root {
+  --ui-primary: var(--color-pingpong-600);
+  --ui-secondary: var(--color-pelota-500);
+}
+
+/* Forzar fondos azul-oscuros en componentes Nuxt UI v4 (sobrescribe neutral default) */
+.dark {
+  --ui-bg: var(--color-deep-950);
+  --ui-bg-muted: var(--color-deep-900);
+  --ui-bg-elevated: var(--color-deep-800);
+  --ui-bg-accented: var(--color-deep-700);
+  --ui-border: rgb(31 57 115 / 0.4);
+  --ui-border-muted: rgb(31 57 115 / 0.25);
+  --ui-border-accented: rgb(31 57 115 / 0.6);
+  --ui-text: #e6ecff;
+  --ui-text-muted: #93b6ff;
+  --ui-text-dimmed: #608dff;
+  --ui-text-toned: #bfd4ff;
+  --ui-text-highlighted: #ffffff;
+}
+
+/* Solid sólo: bg sin alpha (var(--color-…) directo, no /15 ni /10) */
+.dark button.bg-primary,
+.dark button.bg-success,
+.dark button.bg-error,
+.dark button.bg-info,
+.dark a.bg-primary,
+.dark a.bg-success,
+.dark a.bg-error,
+.dark a.bg-info {
+  color: #ffffff !important;
+}
+
+/* Naranja secondary solid → texto oscuro */
+.dark button.bg-secondary,
+.dark a.bg-secondary {
+  color: var(--color-pingpong-950) !important;
+}
+
+/* Inputs sin outline default browser, mantener focus accesible via border/ring custom */
+input,
+textarea,
+select,
+button {
+  outline: none !important;
+}
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--color-pingpong-500) !important;
+  outline-offset: 1px;
+}
+
+button:focus,
+button:focus-visible,
+a:focus,
+a:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+@layer base {
+  html, body, #__nuxt {
+    min-height: 100dvh;
+  }
+
+  body {
+    background:
+      radial-gradient(1200px 600px at 50% -20%, rgba(11, 95, 255, 0.18), transparent 70%),
+      linear-gradient(180deg, #06122b 0%, #0a1f4a 100%);
+    color: #e6ecff;
+    font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    overflow-x: hidden;
+  }
+
+  /* Tipografía competitiva: títulos gaming, números mono */
+  h1, h2, h3, .font-display {
+    font-family: 'Russo One', 'Inter', sans-serif;
+    letter-spacing: 0.01em;
+  }
+
+  .font-mono-num {
+    font-family: 'Chakra Petch', monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Animaciones reducidas para usuarios sensibles */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* Glow sutil para CTAs principales */
+.glow-secondary {
+  box-shadow: 0 0 24px -6px rgba(255, 122, 10, 0.45);
+}
+.glow-primary {
+  box-shadow: 0 0 24px -6px rgba(11, 95, 255, 0.5);
+}

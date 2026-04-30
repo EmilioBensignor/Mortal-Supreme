@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Fondo redondeado azul ping pong -->
+  <rect width="512" height="512" rx="96" fill="#0B5FFF"/>
+  <defs>
+    <radialGradient id="paddleShade" cx="0.4" cy="0.35" r="0.7">
+      <stop offset="0%" stop-color="#ff5252"/>
+      <stop offset="60%" stop-color="#c30b0b"/>
+      <stop offset="100%" stop-color="#7a0606"/>
+    </radialGradient>
+    <linearGradient id="handle" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3a1c00"/>
+      <stop offset="100%" stop-color="#1a0d00"/>
+    </linearGradient>
+    <radialGradient id="ballShade" cx="0.35" cy="0.3" r="0.8">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="80%" stop-color="#ffd9a8"/>
+      <stop offset="100%" stop-color="#ff9333"/>
+    </radialGradient>
+  </defs>
+  <!-- Paleta rotada -->
+  <g transform="translate(256 280) rotate(-30)">
+    <!-- Mango -->
+    <rect x="-22" y="40" width="44" height="150" rx="14" fill="url(#handle)"/>
+    <rect x="-22" y="40" width="44" height="20" rx="6" fill="#000" opacity="0.25"/>
+    <!-- Cabeza paleta -->
+    <ellipse cx="0" cy="-30" rx="135" ry="155" fill="url(#paddleShade)"/>
+    <ellipse cx="0" cy="-30" rx="118" ry="138" fill="none" stroke="#000" stroke-opacity="0.15" stroke-width="6"/>
+    <!-- Goma textura puntos -->
+    <g fill="#000" opacity="0.18">
+      <circle cx="-60" cy="-90" r="4"/>
+      <circle cx="-30" cy="-100" r="4"/>
+      <circle cx="0" cy="-105" r="4"/>
+      <circle cx="30" cy="-100" r="4"/>
+      <circle cx="60" cy="-90" r="4"/>
+      <circle cx="-75" cy="-55" r="4"/>
+      <circle cx="-45" cy="-65" r="4"/>
+      <circle cx="-15" cy="-70" r="4"/>
+      <circle cx="15" cy="-70" r="4"/>
+      <circle cx="45" cy="-65" r="4"/>
+      <circle cx="75" cy="-55" r="4"/>
+      <circle cx="-60" cy="-20" r="4"/>
+      <circle cx="-30" cy="-25" r="4"/>
+      <circle cx="0" cy="-30" r="4"/>
+      <circle cx="30" cy="-25" r="4"/>
+      <circle cx="60" cy="-20" r="4"/>
+    </g>
+  </g>
+  <!-- Pelotita -->
+  <circle cx="370" cy="155" r="44" fill="url(#ballShade)"/>
+  <circle cx="370" cy="155" r="44" fill="none" stroke="#000" stroke-opacity="0.2" stroke-width="2"/>
+  <!-- Trayectoria -->
+  <path d="M 200 130 Q 280 100 350 140" fill="none" stroke="#fff" stroke-opacity="0.5" stroke-width="4" stroke-dasharray="6 8" stroke-linecap="round"/>
+</svg>

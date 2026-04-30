@@ -1,0 +1,25 @@
+# Nuxt
+.nuxt
+.output
+.data
+.vercel
+.netlify
+dist
+
+# Node
+node_modules
+*.log
+.DS_Store
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Vitest
+coverage
+
+# IDE
+.vscode/*
+!.vscode/settings.json
+.idea
