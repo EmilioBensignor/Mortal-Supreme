@@ -3,7 +3,7 @@ definePageMeta({ layout: false })
 
 const route = useRoute()
 const config = useRuntimeConfig()
-const expectedPin = config.public.appPin
+const expectedPin = String(config.public.appPin ?? '')
 
 const pin = ref('')
 const error = ref(null)
@@ -23,8 +23,9 @@ function redirect() {
 }
 
 function submit() {
-  if (pin.value === expectedPin) {
-    window.localStorage.setItem('app-pin', pin.value)
+  const entered = String(pin.value).trim()
+  if (entered === expectedPin) {
+    window.localStorage.setItem('app-pin', entered)
     redirect()
   } else {
     error.value = 'PIN incorrecto'

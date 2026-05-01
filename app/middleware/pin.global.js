@@ -9,7 +9,7 @@
 export default defineNuxtRouteMiddleware((to) => {
   if (import.meta.server) return
   const config = useRuntimeConfig()
-  const expectedPin = config.public.appPin
+  const expectedPin = String(config.public.appPin ?? '')
   if (!expectedPin) return // Sin PIN configurado, abierto
   if (to.path === '/unlock') return
 
