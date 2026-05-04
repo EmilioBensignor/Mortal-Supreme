@@ -3,8 +3,8 @@ const route = useRoute()
 const items = [
   { label: 'Jugadores', icon: 'i-lucide-users', to: '/jugadores' },
   { label: 'Histórico', icon: 'i-lucide-trophy', to: '/historico' },
+  { label: 'Torneos', icon: 'i-lucide-list', to: '/torneos' },
   { label: 'Stats', icon: 'i-lucide-bar-chart-3', to: '/estadisticas' },
-  { label: 'Ajustes', icon: 'i-lucide-settings', to: '/ajustes' },
 ]
 </script>
 

@@ -186,8 +186,9 @@ export const useTournamentStore = defineStore('tournament', () => {
   }
 
   async function recordWinner(matchId: string, winnerId: string) {
-    const match = matches.value.find(m => m.id === matchId)
-    if (!match) throw new Error('Match no encontrado')
+    const idx = matches.value.findIndex(m => m.id === matchId)
+    if (idx < 0) throw new Error('Match no encontrado')
+    const match = matches.value[idx]!
     if (winnerId !== match.player1_id && winnerId !== match.player2_id) {
       throw new Error('El ganador debe ser uno de los jugadores del match')
     }
@@ -195,37 +196,72 @@ export const useTournamentStore = defineStore('tournament', () => {
     const previousWinner = match.winner_id
     if (wasCompleted && previousWinner === winnerId) return // no-op
 
-    // Update match
-    const { data, error } = await supabase
-      .from('matches')
-      .update({
-        winner_id: winnerId,
-        status: 'completed',
-        played_at: new Date().toISOString(),
-      })
-      .eq('id', matchId)
-      .select()
-      .single()
-    if (error) throw error
-    const idx = matches.value.findIndex(m => m.id === matchId)
-    matches.value[idx] = data as Match
+    // 1) UI optimista: actualizar match local inmediatamente
+    const optimisticPlayedAt = new Date().toISOString()
+    const previousMatchSnapshot: Match = { ...match }
+    matches.value[idx] = {
+      ...match,
+      winner_id: winnerId,
+      status: 'completed',
+      played_at: optimisticPlayedAt,
+    } as Match
 
-    // Update tournament_players (puntos solo si match_type cuenta para liga)
+    // 2) Calcular y aplicar deltas locales en standings antes del network
     const counts = match.match_type === 'regular' || match.match_type === 'final'
+    const newLoserId = winnerId === match.player1_id ? match.player2_id : match.player1_id
+    const localDeltas: Array<{ playerId: string, delta: Partial<Pick<TournamentPlayer, 'points' | 'wins' | 'losses'>> }> = []
     if (counts) {
-      const newLoserId = winnerId === match.player1_id ? match.player2_id : match.player1_id
       if (wasCompleted && previousWinner) {
-        // Revertir resultado anterior y aplicar el nuevo
         const previousLoser = previousWinner === match.player1_id ? match.player2_id : match.player1_id
-        await adjustTournamentPlayer(match.tournament_id, previousWinner, { points: -1, wins: -1 })
-        await adjustTournamentPlayer(match.tournament_id, previousLoser, { losses: -1 })
+        localDeltas.push({ playerId: previousWinner, delta: { points: -1, wins: -1 } })
+        localDeltas.push({ playerId: previousLoser, delta: { losses: -1 } })
       }
-      await adjustTournamentPlayer(match.tournament_id, winnerId, { points: +1, wins: +1 })
-      await adjustTournamentPlayer(match.tournament_id, newLoserId, { losses: +1 })
+      localDeltas.push({ playerId: winnerId, delta: { points: +1, wins: +1 } })
+      localDeltas.push({ playerId: newLoserId, delta: { losses: +1 } })
+      for (const d of localDeltas) applyLocalTournamentPlayerDelta(match.tournament_id, d.playerId, d.delta)
     }
 
-    // ¿Turn completo? (solo si pertenece a un turn de round)
-    if (!wasCompleted) await checkAdvanceTurn(match.turn_id)
+    // 3) Avance optimista de turn si corresponde
+    const turnAdvanced = !wasCompleted ? checkAdvanceTurnLocal(match.turn_id) : null
+
+    // 4) Persistir en background — si falla, revertir todo
+    try {
+      const { data, error } = await supabase
+        .from('matches')
+        .update({
+          winner_id: winnerId,
+          status: 'completed',
+          played_at: optimisticPlayedAt,
+        })
+        .eq('id', matchId)
+        .select()
+        .single()
+      if (error) throw error
+      matches.value[idx] = data as Match
+
+      if (counts) {
+        for (const d of localDeltas) {
+          await persistTournamentPlayerDelta(match.tournament_id, d.playerId, d.delta)
+        }
+      }
+      if (turnAdvanced) await persistTurnAdvance(turnAdvanced)
+    } catch (e) {
+      // Revertir match local
+      matches.value[idx] = previousMatchSnapshot
+      // Revertir deltas locales
+      if (counts) {
+        for (const d of localDeltas) {
+          const inverted: Partial<Pick<TournamentPlayer, 'points' | 'wins' | 'losses'>> = {}
+          if (d.delta.points) inverted.points = -d.delta.points
+          if (d.delta.wins) inverted.wins = -d.delta.wins
+          if (d.delta.losses) inverted.losses = -d.delta.losses
+          applyLocalTournamentPlayerDelta(match.tournament_id, d.playerId, inverted)
+        }
+      }
+      // Revertir avance de turn local si lo hubo
+      if (turnAdvanced) revertTurnAdvanceLocal(turnAdvanced)
+      throw e
+    }
   }
 
   /**
@@ -324,48 +360,117 @@ export const useTournamentStore = defineStore('tournament', () => {
     playerId: string,
     delta: Partial<Pick<TournamentPlayer, 'points' | 'wins' | 'losses' | 'rests'>>,
   ) {
+    applyLocalTournamentPlayerDelta(tournamentId, playerId, delta)
+    await persistTournamentPlayerDelta(tournamentId, playerId, delta)
+  }
+
+  // Aplica el delta solo en memoria (UI optimista)
+  function applyLocalTournamentPlayerDelta(
+    tournamentId: string,
+    playerId: string,
+    delta: Partial<Pick<TournamentPlayer, 'points' | 'wins' | 'losses' | 'rests'>>,
+  ) {
+    const tp = tournamentPlayers.value.find(t => t.tournament_id === tournamentId && t.player_id === playerId)
+    if (!tp) return
+    if (delta.points) tp.points = tp.points + delta.points
+    if (delta.wins) tp.wins = tp.wins + delta.wins
+    if (delta.losses) tp.losses = tp.losses + delta.losses
+    if (delta.rests) tp.rests = tp.rests + delta.rests
+  }
+
+  // Persiste el estado actual del tp (después de aplicar delta local)
+  async function persistTournamentPlayerDelta(
+    tournamentId: string,
+    playerId: string,
+    delta: Partial<Pick<TournamentPlayer, 'points' | 'wins' | 'losses' | 'rests'>>,
+  ) {
     const tp = tournamentPlayers.value.find(t => t.tournament_id === tournamentId && t.player_id === playerId)
     if (!tp) return
     const update: Partial<TournamentPlayer> = {}
-    if (delta.points) update.points = tp.points + delta.points
-    if (delta.wins) update.wins = tp.wins + delta.wins
-    if (delta.losses) update.losses = tp.losses + delta.losses
-    if (delta.rests) update.rests = tp.rests + delta.rests
+    // Persistir el valor actual del campo si el delta lo tocó
+    if (delta.points) update.points = tp.points
+    if (delta.wins) update.wins = tp.wins
+    if (delta.losses) update.losses = tp.losses
+    if (delta.rests) update.rests = tp.rests
+    if (Object.keys(update).length === 0) return
     const { error } = await supabase
       .from('tournament_players')
       .update(update)
       .eq('tournament_id', tournamentId)
       .eq('player_id', playerId)
     if (error) throw error
-    Object.assign(tp, update)
   }
 
-  async function checkAdvanceTurn(turnId: string | null) {
-    if (!turnId) return
-    const turnMatches = matches.value.filter(m => m.turn_id === turnId)
-    if (turnMatches.every(m => m.status === 'completed')) {
-      await supabase.from('turns').update({ status: 'completed' }).eq('id', turnId)
-      const tIdx = turns.value.findIndex(t => t.id === turnId)
-      if (tIdx >= 0) turns.value[tIdx]!.status = 'completed'
+  // Tipo del avance de turn aplicado localmente (para persistir o revertir)
+  type TurnAdvance = {
+    completedTurnId: string
+    nextTurnId: string | null
+    completedRoundId: string | null
+    restingPlayerId: string | null
+    tournamentId: string | null
+  }
 
-      // Activar próximo turn
-      const turn = turns.value[tIdx]
-      if (turn) {
-        const next = turns.value.find(t => t.round_id === turn.round_id && t.status === 'pending')
-        if (next) {
-          await supabase.from('turns').update({ status: 'in_progress' }).eq('id', next.id)
-          next.status = 'in_progress'
-          // Sumar descanso
-          if (next.resting_player_id) {
-            await adjustTournamentPlayer(turn.round_id ? tournament.value!.id : '', next.resting_player_id, { rests: +1 })
-          }
-        } else {
-          // Round completa
-          await supabase.from('rounds').update({ status: 'completed' }).eq('id', turn.round_id)
-          const rIdx = rounds.value.findIndex(r => r.id === turn.round_id)
-          if (rIdx >= 0) rounds.value[rIdx]!.status = 'completed'
-        }
+  // Aplica avance de turn solo en memoria. Devuelve descripción para persistir/revertir.
+  function checkAdvanceTurnLocal(turnId: string | null): TurnAdvance | null {
+    if (!turnId) return null
+    const turnMatches = matches.value.filter(m => m.turn_id === turnId)
+    if (turnMatches.length === 0) return null
+    if (!turnMatches.every(m => m.status === 'completed')) return null
+
+    const tIdx = turns.value.findIndex(t => t.id === turnId)
+    if (tIdx < 0) return null
+    const turn = turns.value[tIdx]!
+    turn.status = 'completed'
+
+    const next = turns.value.find(t => t.round_id === turn.round_id && t.status === 'pending')
+    let completedRoundId: string | null = null
+    let restingPlayerId: string | null = null
+    if (next) {
+      next.status = 'in_progress'
+      if (next.resting_player_id && tournament.value) {
+        restingPlayerId = next.resting_player_id
+        applyLocalTournamentPlayerDelta(tournament.value.id, next.resting_player_id, { rests: +1 })
       }
+    } else {
+      completedRoundId = turn.round_id
+      const rIdx = rounds.value.findIndex(r => r.id === turn.round_id)
+      if (rIdx >= 0) rounds.value[rIdx]!.status = 'completed'
+    }
+    return {
+      completedTurnId: turn.id,
+      nextTurnId: next?.id ?? null,
+      completedRoundId,
+      restingPlayerId,
+      tournamentId: tournament.value?.id ?? null,
+    }
+  }
+
+  async function persistTurnAdvance(adv: TurnAdvance) {
+    await supabase.from('turns').update({ status: 'completed' }).eq('id', adv.completedTurnId)
+    if (adv.nextTurnId) {
+      await supabase.from('turns').update({ status: 'in_progress' }).eq('id', adv.nextTurnId)
+      if (adv.restingPlayerId && adv.tournamentId) {
+        await persistTournamentPlayerDelta(adv.tournamentId, adv.restingPlayerId, { rests: +1 })
+      }
+    }
+    if (adv.completedRoundId) {
+      await supabase.from('rounds').update({ status: 'completed' }).eq('id', adv.completedRoundId)
+    }
+  }
+
+  function revertTurnAdvanceLocal(adv: TurnAdvance) {
+    const completedTurnIdx = turns.value.findIndex(t => t.id === adv.completedTurnId)
+    if (completedTurnIdx >= 0) turns.value[completedTurnIdx]!.status = 'in_progress'
+    if (adv.nextTurnId) {
+      const nextIdx = turns.value.findIndex(t => t.id === adv.nextTurnId)
+      if (nextIdx >= 0) turns.value[nextIdx]!.status = 'pending'
+      if (adv.restingPlayerId && adv.tournamentId) {
+        applyLocalTournamentPlayerDelta(adv.tournamentId, adv.restingPlayerId, { rests: -1 })
+      }
+    }
+    if (adv.completedRoundId) {
+      const rIdx = rounds.value.findIndex(r => r.id === adv.completedRoundId)
+      if (rIdx >= 0) rounds.value[rIdx]!.status = 'in_progress'
     }
   }
 
