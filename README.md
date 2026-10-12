@@ -19,19 +19,19 @@ cp .env.example .env
 # Completar SUPABASE_URL y SUPABASE_KEY (anon public key) con tus valores
 
 # 2. Instalar
-npm install
+pnpm install
 
 # 3. Crear el schema en Supabase
 # Pegar el contenido de supabase/schema.sql en el SQL Editor de Supabase y ejecutar
 
 # 4. Dev
-npm run dev
+pnpm dev
 
 # 5. Tests del scheduler (21 tests para N=2..8 con T=1,2)
-npm test
+pnpm test
 
 # 6. Build producción
-npm run build
+pnpm build
 ```
 
 ## Decisiones del MVP
@@ -39,41 +39,13 @@ npm run build
 - **Sin auth**: single-user, todo abierto. La columna `owner_user_id` está preparada para multi-user futuro.
 - **Scheduler greedy** (no perfecto pero válido): respeta restricciones duras (1 jugador por turn, T mesas) y balancea descansos. Tests cubren N=2..8 con T=1 y T=2.
 - **Offline básico**: el service worker (NetworkFirst) cachea shell y respuestas Supabase. Para offline robusto con cola de mutaciones, ver "Roadmap" abajo.
-- **Paleta**: azul ITTF (mesa de torneo) + naranja pelotita.
+- **Diseño**: tema claro "Scoreboard" con la mesa azul como motivo. Tokens y reglas en `CLAUDE.md`.
 
-## Estructura
+## Documentación
 
-```
-app/
-  app.vue              # shell + indicador online
-  app.config.ts        # tema Nuxt UI
-  layouts/default.vue  # nav inferior + header
-  pages/
-    index.vue          # home: torneo activo / últimos torneos
-    jugadores.vue      # CRUD players
-    jugadores/[id].vue # detalle jugador + h2h
-    historico.vue      # ranking
-    estadisticas.vue   # win rate + trofeos
-    nuevo-torneo.vue   # wizard 3 pasos
-    torneo/[id].vue    # vista en vivo del torneo
-  stores/
-    players.ts
-    tournament.ts      # incluye scheduler + persistencia
-  utils/
-    scheduler.ts       # round-robin greedy con T mesas
-  composables/
-    useRestMessages.ts # mensajes random para el que descansa
-  assets/css/main.css  # tokens de paleta
-supabase/
-  schema.sql           # ejecutar en SQL Editor
-tests/
-  scheduler.test.ts    # 21 tests
-types/
-  database.ts          # stub (reemplazar por gen types ts)
-public/
-  icon.svg             # icono base (paleta de ping pong)
-  pwa-*.png            # iconos generados desde icon.svg
-```
+- `CLAUDE.md`: reglas vigentes, design system, estado actual de cada sistema.
+- `docs/sistemas.md`: detalle del store del torneo, desempate y minijuegos.
+- `docs/bitacora.md`: historia con fecha.
 
 ## Generar tipos TS desde Supabase (recomendado)
 
