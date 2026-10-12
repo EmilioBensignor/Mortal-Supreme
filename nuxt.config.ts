@@ -40,19 +40,20 @@ export default defineNuxtConfig({
   },
 
   colorMode: {
-    preference: 'dark',
-    fallback: 'dark',
+    preference: 'light',
+    fallback: 'light',
+    storageKey: 'mortal-color-mode',
     classSuffix: '',
   },
 
   app: {
     head: {
-      htmlAttrs: { lang: 'es', class: 'dark' },
+      htmlAttrs: { lang: 'es' },
       title: 'Mortal Supreme',
       meta: [
         { name: 'viewport', content: 'width=device-width, initial-scale=1, viewport-fit=cover' },
         { name: 'description', content: 'El torneo definitivo de ping pong de Mortal Kombat' },
-        { name: 'theme-color', content: '#0B5FFF' },
+        { name: 'theme-color', content: '#FFFFFF' },
       ],
       link: [
         { rel: 'icon', type: 'image/svg+xml', href: '/icon.svg' },
@@ -61,7 +62,7 @@ export default defineNuxtConfig({
         { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' },
         {
           rel: 'stylesheet',
-          href: 'https://fonts.googleapis.com/css2?family=Russo+One&family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap',
+          href: 'https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700;800&family=Saira:wght@400;500;600;700&display=swap',
         },
       ],
     },
@@ -74,8 +75,8 @@ export default defineNuxtConfig({
       short_name: 'Mortal',
       description: 'El torneo definitivo de ping pong',
       lang: 'es',
-      theme_color: '#0B5FFF',
-      background_color: '#06122B',
+      theme_color: '#FFFFFF',
+      background_color: '#ECEEF1',
       display: 'standalone',
       orientation: 'portrait',
       start_url: '/',
@@ -128,7 +129,7 @@ export default defineNuxtConfig({
 
   vite: {
     optimizeDeps: {
-      include: ['@vue/devtools-core', '@vue/devtools-kit', 'workbox-window'],
+      include: ['@vue/devtools-core', '@vue/devtools-kit', 'canvas-confetti', 'workbox-window'],
     },
   },
 })

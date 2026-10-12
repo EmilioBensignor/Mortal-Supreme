@@ -1,4 +1,4 @@
-import { defineStore } from 'pinia'
+import { acceptHMRUpdate, defineStore } from 'pinia'
 import type { Match, Player, Round, Tournament, TournamentPlayer, Turn, TournamentFormat } from '~~/types/database'
 import { schedule } from '~/utils/scheduler'
 
@@ -47,6 +47,36 @@ export const useTournamentStore = defineStore('tournament', () => {
     return matches.value
       .filter(m => m.turn_id === currentTurn.value!.id)
       .sort((a, b) => (a.table_number ?? 0) - (b.table_number ?? 0))
+  })
+
+  const nextTurn = computed<Turn | null>(() => {
+    if (!currentTurn.value) return null
+    return currentTurns.value.find(t => t.status === 'pending' && t.turn_number > currentTurn.value!.turn_number) ?? null
+  })
+
+  const nextTurnMatches = computed<Match[]>(() => {
+    if (!nextTurn.value) return []
+    return matches.value
+      .filter(m => m.turn_id === nextTurn.value!.id)
+      .sort((a, b) => (a.table_number ?? 0) - (b.table_number ?? 0))
+  })
+
+  const busyPlayerIds = computed(() => {
+    const ids = new Set<string>()
+    for (const m of currentTurnMatches.value) {
+      if (m.status === 'completed') continue
+      ids.add(m.player1_id)
+      ids.add(m.player2_id)
+    }
+    return ids
+  })
+
+  const waitingPlayers = computed<Player[]>(() => {
+    if (!currentTurn.value) return []
+    return tournamentPlayers.value
+      .filter(tp => !busyPlayerIds.value.has(tp.player_id))
+      .map(tp => players.value.find(p => p.id === tp.player_id))
+      .filter((p): p is Player => !!p)
   })
 
   const restingPlayer = computed<Player | null>(() => {
@@ -222,7 +252,7 @@ export const useTournamentStore = defineStore('tournament', () => {
     }
 
     // 3) Avance optimista de turn si corresponde
-    const turnAdvanced = !wasCompleted ? checkAdvanceTurnLocal(match.turn_id) : null
+    const turnAdvances = !wasCompleted ? checkAdvanceTurnLocal(match.turn_id) : []
 
     // 4) Persistir en background — si falla, revertir todo
     try {
@@ -244,7 +274,7 @@ export const useTournamentStore = defineStore('tournament', () => {
           await persistTournamentPlayerDelta(match.tournament_id, d.playerId, d.delta)
         }
       }
-      if (turnAdvanced) await persistTurnAdvance(turnAdvanced)
+      for (const adv of turnAdvances) await persistTurnAdvance(adv)
     } catch (e) {
       // Revertir match local
       matches.value[idx] = previousMatchSnapshot
@@ -259,7 +289,7 @@ export const useTournamentStore = defineStore('tournament', () => {
         }
       }
       // Revertir avance de turn local si lo hubo
-      if (turnAdvanced) revertTurnAdvanceLocal(turnAdvanced)
+      for (const adv of [...turnAdvances].reverse()) revertTurnAdvanceLocal(adv)
       throw e
     }
   }
@@ -410,39 +440,43 @@ export const useTournamentStore = defineStore('tournament', () => {
     tournamentId: string | null
   }
 
-  // Aplica avance de turn solo en memoria. Devuelve descripción para persistir/revertir.
-  function checkAdvanceTurnLocal(turnId: string | null): TurnAdvance | null {
-    if (!turnId) return null
+  function isTurnComplete(turnId: string) {
     const turnMatches = matches.value.filter(m => m.turn_id === turnId)
-    if (turnMatches.length === 0) return null
-    if (!turnMatches.every(m => m.status === 'completed')) return null
+    return turnMatches.length > 0 && turnMatches.every(m => m.status === 'completed')
+  }
 
-    const tIdx = turns.value.findIndex(t => t.id === turnId)
-    if (tIdx < 0) return null
-    const turn = turns.value[tIdx]!
-    turn.status = 'completed'
-
-    const next = turns.value.find(t => t.round_id === turn.round_id && t.status === 'pending')
-    let completedRoundId: string | null = null
-    let restingPlayerId: string | null = null
-    if (next) {
-      next.status = 'in_progress'
-      if (next.resting_player_id && tournament.value) {
-        restingPlayerId = next.resting_player_id
-        applyLocalTournamentPlayerDelta(tournament.value.id, next.resting_player_id, { rests: +1 })
+  function checkAdvanceTurnLocal(turnId: string | null): TurnAdvance[] {
+    const advances: TurnAdvance[] = []
+    let turn = turns.value.find(t => t.id === turnId)
+    while (turn && turn.status === 'in_progress' && isTurnComplete(turn.id)) {
+      turn.status = 'completed'
+      const roundId = turn.round_id
+      const next = turns.value
+        .filter(t => t.round_id === roundId && t.status === 'pending')
+        .sort((a, b) => a.turn_number - b.turn_number)[0]
+      let completedRoundId: string | null = null
+      let restingPlayerId: string | null = null
+      if (next) {
+        next.status = 'in_progress'
+        if (next.resting_player_id && tournament.value) {
+          restingPlayerId = next.resting_player_id
+          applyLocalTournamentPlayerDelta(tournament.value.id, next.resting_player_id, { rests: +1 })
+        }
+      } else {
+        completedRoundId = roundId
+        const rIdx = rounds.value.findIndex(r => r.id === roundId)
+        if (rIdx >= 0) rounds.value[rIdx]!.status = 'completed'
       }
-    } else {
-      completedRoundId = turn.round_id
-      const rIdx = rounds.value.findIndex(r => r.id === turn.round_id)
-      if (rIdx >= 0) rounds.value[rIdx]!.status = 'completed'
+      advances.push({
+        completedTurnId: turn.id,
+        nextTurnId: next?.id ?? null,
+        completedRoundId,
+        restingPlayerId,
+        tournamentId: tournament.value?.id ?? null,
+      })
+      turn = next
     }
-    return {
-      completedTurnId: turn.id,
-      nextTurnId: next?.id ?? null,
-      completedRoundId,
-      restingPlayerId,
-      tournamentId: tournament.value?.id ?? null,
-    }
+    return advances
   }
 
   async function persistTurnAdvance(adv: TurnAdvance) {
@@ -552,8 +586,10 @@ export const useTournamentStore = defineStore('tournament', () => {
 
   return {
     tournament, tournamentPlayers, players, rounds, turns, matches, loading,
-    currentRound, currentTurn, currentTurnMatches, restingPlayer, standings,
+    currentRound, currentTurn, currentTurnMatches, nextTurn, nextTurnMatches, busyPlayerIds, waitingPlayers, restingPlayer, standings,
     load, createTournament, recordWinner, unrecordWinner, resyncFinishedTournamentWinner,
     abortRound, startNextRound, addExtraMatch, finishTournament,
   }
 })
+
+if (import.meta.hot) import.meta.hot.accept(acceptHMRUpdate(useTournamentStore, import.meta.hot))

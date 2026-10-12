@@ -1,3 +1,113 @@
+<template>
+  <div class="flex flex-col gap-5">
+    <header class="flex items-end justify-between gap-3">
+      <h1 class="font-display text-ink text-3xl font-extrabold uppercase leading-none">Nuevo torneo</h1>
+      <span class="font-display text-muted text-sm font-bold uppercase tracking-widest tabular-nums">Paso {{ step }} / 3</span>
+    </header>
+
+    <!-- PASO 1 -->
+    <section v-if="step === 1" class="flex flex-col gap-4">
+      <div class="flex flex-col gap-3 bg-surface border border-solid border-line rounded-xl p-4">
+        <label class="font-display text-muted text-sm font-bold uppercase tracking-widest">Formato</label>
+        <URadioGroup
+          v-model="format"
+          color="secondary"
+          :items="[
+            { label: 'Liga (puntos por victoria)', value: 'league' },
+            { label: 'Lightning (rápido, sin histórico)', value: 'lightning' },
+          ]"
+        />
+
+        <label class="font-display text-muted text-sm font-bold uppercase tracking-widest mt-2">Puntos por partido</label>
+        <UInput v-model.number="targetScore" type="number" :min="1" size="lg" />
+
+        <label class="font-display text-muted text-sm font-bold uppercase tracking-widest mt-2">Cantidad de mesas</label>
+        <UInput v-model.number="tablesCount" type="number" :min="1" :max="8" size="lg" />
+
+        <UCheckbox v-model="countsForHistory" color="secondary" label="Cuenta para el ranking histórico" class="mt-2" />
+      </div>
+      <UButton
+        color="secondary"
+        block
+        size="xl"
+        class="min-h-13 font-display text-base font-bold uppercase tracking-wider"
+        @click="step = 2"
+      >
+        Siguiente
+      </UButton>
+    </section>
+
+    <!-- PASO 2 -->
+    <section v-if="step === 2" class="flex flex-col gap-4">
+      <div class="flex flex-col gap-3 bg-surface border border-solid border-line rounded-xl p-4">
+        <p class="font-display text-muted text-sm font-bold uppercase tracking-widest">Jugadores ({{ selectedIds.length }})</p>
+        <ul class="flex flex-wrap gap-2">
+          <li v-for="p in playersStore.active" :key="p.id" class="max-w-full">
+            <button
+              type="button"
+              class="max-w-full min-h-11 border border-solid rounded-full text-base font-semibold truncate transition-colors px-4"
+              :class="selectedIds.includes(p.id) ? 'bg-ink border-ink text-white' : 'bg-surface border-line text-ink'"
+              @click="toggle(p.id)"
+            >
+              {{ p.name }}
+            </button>
+          </li>
+        </ul>
+
+        <div class="flex gap-2 border-t border-solid border-line pt-3">
+          <UInput v-model="newPlayerName" placeholder="Crear nuevo…" class="flex-1 min-w-0" @keyup.enter="quickCreatePlayer" />
+          <UButton icon="i-lucide-plus" color="neutral" variant="outline" @click="quickCreatePlayer" />
+        </div>
+        <p v-if="error" class="text-error text-sm">{{ error }}</p>
+      </div>
+      <div class="flex gap-2">
+        <UButton color="neutral" variant="outline" block size="lg" @click="step = 1">Atrás</UButton>
+        <UButton color="secondary" block size="lg" :disabled="selectedIds.length < 2" @click="step = 3">
+          Siguiente
+        </UButton>
+      </div>
+    </section>
+
+    <!-- PASO 3 -->
+    <section v-if="step === 3" class="flex flex-col gap-4">
+      <div class="flex flex-col gap-5 bg-surface border border-solid border-line rounded-xl p-4">
+        <div class="flex flex-col gap-3">
+          <label class="font-display text-muted text-sm font-bold uppercase tracking-widest">Nombre del torneo (opcional)</label>
+          <UInput v-model="tournamentName" placeholder="Auto: Torneo del DD/MM" size="lg" />
+        </div>
+        <div class="grid grid-cols-3 bg-sunken rounded-xl text-center">
+          <div class="flex flex-col px-2 py-3">
+            <span class="font-display text-ink text-3xl font-extrabold leading-none tabular-nums">{{ selectedIds.length }}</span>
+            <span class="font-display text-muted text-sm font-bold uppercase tracking-widest mt-1">Jugadores</span>
+          </div>
+          <div class="flex flex-col border-solid border-line not-first:border-l px-2 py-3">
+            <span class="font-display text-ink text-3xl font-extrabold leading-none tabular-nums">{{ totalMatches }}</span>
+            <span class="font-display text-muted text-sm font-bold uppercase tracking-widest mt-1">Matches</span>
+          </div>
+          <div class="flex flex-col border-solid border-line not-first:border-l px-2 py-3">
+            <span class="font-display text-ink text-3xl font-extrabold leading-none tabular-nums">~{{ estimatedTurns }}</span>
+            <span class="font-display text-muted text-sm font-bold uppercase tracking-widest mt-1">Turns</span>
+          </div>
+        </div>
+        <p v-if="error" class="text-error text-sm">{{ error }}</p>
+      </div>
+      <div class="flex gap-2">
+        <UButton color="neutral" variant="outline" size="xl" class="min-h-13" @click="step = 2">Atrás</UButton>
+        <UButton
+          color="secondary"
+          block
+          size="xl"
+          :loading="creating"
+          class="min-h-13 font-display text-base font-bold uppercase tracking-wider"
+          @click="confirm"
+        >
+          ¡Empezar!
+        </UButton>
+      </div>
+    </section>
+  </div>
+</template>
+
 <script setup>
 import { expectedMatches } from '~/utils/scheduler'
 
@@ -71,99 +181,3 @@ async function confirm() {
   }
 }
 </script>
-
-<template>
-  <div class="flex flex-col gap-5">
-    <header class="flex items-center justify-between">
-      <h1 class="text-light text-2xl font-bold">Nuevo torneo</h1>
-      <span class="text-pingpong-300 text-sm">Paso {{ step }} / 3</span>
-    </header>
-
-    <!-- PASO 1 -->
-    <section v-if="step === 1" class="flex flex-col gap-4">
-      <UCard>
-        <div class="flex flex-col gap-3">
-          <label class="text-pingpong-200 text-sm">Formato</label>
-          <URadioGroup
-            v-model="format"
-            :items="[
-              { label: 'Liga (puntos por victoria)', value: 'league' },
-              { label: 'Lightning (rápido, sin histórico)', value: 'lightning' },
-            ]"
-          />
-
-          <label class="text-pingpong-200 text-sm mt-2">Puntos por partido (target score)</label>
-          <UInput v-model.number="targetScore" type="number" :min="1" />
-
-          <label class="text-pingpong-200 text-sm mt-2">Cantidad de mesas</label>
-          <UInput v-model.number="tablesCount" type="number" :min="1" :max="8" />
-
-          <UCheckbox v-model="countsForHistory" label="Cuenta para el ranking histórico" />
-        </div>
-      </UCard>
-      <UButton color="secondary" block size="lg" @click="step = 2">Siguiente</UButton>
-    </section>
-
-    <!-- PASO 2 -->
-    <section v-if="step === 2" class="flex flex-col gap-4">
-      <UCard>
-        <p class="text-pingpong-200 text-sm mb-2">Seleccionar jugadores ({{ selectedIds.length }})</p>
-        <ul class="grid grid-cols-2 gap-2">
-          <li v-for="p in playersStore.active" :key="p.id">
-            <button
-              type="button"
-              class="w-full bg-pingpong-700/30 hover:bg-pingpong-600/40 border border-solid rounded-xl text-light text-sm font-semibold transition-colors px-3 py-2"
-              :class="selectedIds.includes(p.id) ? 'border-secondary bg-pingpong-600/50' : 'border-transparent'"
-              @click="toggle(p.id)"
-            >
-              {{ p.name }}
-            </button>
-          </li>
-        </ul>
-
-        <div class="flex gap-2 mt-4">
-          <UInput v-model="newPlayerName" placeholder="Crear nuevo…" class="flex-1" @keyup.enter="quickCreatePlayer" />
-          <UButton icon="i-lucide-plus" @click="quickCreatePlayer" />
-        </div>
-        <p v-if="error" class="text-error text-sm mt-2">{{ error }}</p>
-      </UCard>
-      <div class="flex gap-2">
-        <UButton variant="ghost" block @click="step = 1">Atrás</UButton>
-        <UButton color="secondary" block :disabled="selectedIds.length < 2" @click="step = 3">
-          Siguiente
-        </UButton>
-      </div>
-    </section>
-
-    <!-- PASO 3 -->
-    <section v-if="step === 3" class="flex flex-col gap-4">
-      <UCard>
-        <div class="flex flex-col gap-3">
-          <label class="text-pingpong-200 text-sm">Nombre del torneo (opcional)</label>
-          <UInput v-model="tournamentName" placeholder="Auto: Torneo del DD/MM" />
-        </div>
-        <div class="grid grid-cols-3 gap-3 text-center mt-5">
-          <div>
-            <div class="text-light text-2xl font-bold">{{ selectedIds.length }}</div>
-            <div class="text-pingpong-300 text-xs">Jugadores</div>
-          </div>
-          <div>
-            <div class="text-light text-2xl font-bold">{{ totalMatches }}</div>
-            <div class="text-pingpong-300 text-xs">Matches</div>
-          </div>
-          <div>
-            <div class="text-light text-2xl font-bold">~{{ estimatedTurns }}</div>
-            <div class="text-pingpong-300 text-xs">Turns</div>
-          </div>
-        </div>
-        <p v-if="error" class="text-error text-sm mt-3">{{ error }}</p>
-      </UCard>
-      <div class="flex gap-2">
-        <UButton variant="ghost" block @click="step = 2">Atrás</UButton>
-        <UButton color="secondary" block size="lg" :loading="creating" @click="confirm">
-          ¡Empezar!
-        </UButton>
-      </div>
-    </section>
-  </div>
-</template>

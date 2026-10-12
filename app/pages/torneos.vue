@@ -1,3 +1,95 @@
+<template>
+  <div class="flex flex-col gap-5">
+    <div class="flex items-center justify-between gap-3">
+      <h1 class="font-display text-ink text-3xl font-extrabold uppercase leading-none">Torneos</h1>
+      <UButton
+        to="/nuevo-torneo"
+        color="secondary"
+        icon="i-lucide-plus"
+        class="font-display font-bold uppercase tracking-wider"
+      >
+        Nuevo
+      </UButton>
+    </div>
+
+    <!-- VACIO -->
+    <section
+      v-if="!tournaments?.length"
+      class="flex flex-col items-center gap-2 bg-surface border border-solid border-line rounded-xl text-center px-6 py-10"
+    >
+      <UIcon name="i-lucide-swords" class="size-10 text-muted" />
+      <p class="text-ink text-base font-semibold">Sin torneos todavía</p>
+      <p class="text-muted text-sm">Creá el primero para arrancar</p>
+    </section>
+
+    <!-- EN CURSO -->
+    <section v-if="inProgress.length > 0" class="flex flex-col gap-2">
+      <h2 class="font-display text-muted text-sm font-bold uppercase tracking-widest">En curso</h2>
+      <ul class="flex flex-col gap-2">
+        <li v-for="t in inProgress" :key="t.id">
+          <NuxtLink
+            :to="`/torneo/${t.id}`"
+            class="flex items-center gap-3 bg-board rounded-xl text-board-fg transition-opacity active:opacity-90 p-4"
+          >
+            <TournamentLiveTag />
+            <div class="flex flex-col flex-1 min-w-0">
+              <span class="font-display text-lg font-bold uppercase tracking-wider truncate">{{ t.name }}</span>
+              <span class="text-board-dim text-sm">{{ t.players_count }} jugadores · {{ formatDate(t.created_at) }}</span>
+            </div>
+            <UIcon name="i-lucide-chevron-right" class="size-4 shrink-0 text-board-dim" />
+          </NuxtLink>
+        </li>
+      </ul>
+    </section>
+
+    <!-- FINALIZADOS -->
+    <section v-if="finished.length > 0" class="flex flex-col gap-2">
+      <h2 class="font-display text-muted text-sm font-bold uppercase tracking-widest">Finalizados</h2>
+      <ul class="flex flex-col bg-surface border border-solid border-line rounded-xl px-4">
+        <li v-for="t in finished" :key="t.id" class="border-solid border-line not-first:border-t">
+          <NuxtLink
+            :to="`/torneo/${t.id}`"
+            class="flex items-center gap-3 transition-colors active:bg-sunken py-3"
+          >
+            <UIcon name="i-lucide-trophy" class="size-5 shrink-0 text-accent" />
+            <div class="flex flex-col flex-1 min-w-0">
+              <span class="text-ink text-base font-semibold truncate">{{ t.name }}</span>
+              <span class="text-muted text-sm truncate">
+                <strong v-if="t.winner_name" class="text-ink font-semibold">{{ t.winner_name }}</strong>
+                <span v-else>Sin ganador</span>
+                · {{ formatDate(t.finished_at ?? t.created_at) }}
+                <template v-if="!t.counts_for_history"> · no cuenta</template>
+              </span>
+            </div>
+            <span class="shrink-0 font-display text-muted text-sm font-bold tabular-nums">{{ t.players_count }}p</span>
+            <UIcon name="i-lucide-chevron-right" class="size-4 shrink-0 text-muted" />
+          </NuxtLink>
+        </li>
+      </ul>
+    </section>
+
+    <!-- OTROS (abandonados / setup) -->
+    <section v-if="others.length > 0" class="flex flex-col gap-2">
+      <h2 class="font-display text-muted text-sm font-bold uppercase tracking-widest">Otros</h2>
+      <ul class="flex flex-col bg-surface border border-solid border-line rounded-xl px-4">
+        <li v-for="t in others" :key="t.id" class="border-solid border-line not-first:border-t">
+          <NuxtLink
+            :to="`/torneo/${t.id}`"
+            class="flex items-center gap-3 transition-colors active:bg-sunken py-3"
+          >
+            <UIcon name="i-lucide-circle-dashed" class="size-5 shrink-0 text-muted" />
+            <div class="flex flex-col flex-1 min-w-0">
+              <span class="text-ink text-base font-semibold truncate">{{ t.name }}</span>
+              <span class="text-muted text-sm">{{ t.status }} · {{ formatDate(t.created_at) }}</span>
+            </div>
+            <UIcon name="i-lucide-chevron-right" class="size-4 shrink-0 text-muted" />
+          </NuxtLink>
+        </li>
+      </ul>
+    </section>
+  </div>
+</template>
+
 <script setup>
 const supabase = useSupabaseClient()
 
@@ -54,99 +146,3 @@ function formatDate(iso) {
   })
 }
 </script>
-
-<template>
-  <div class="flex flex-col gap-5">
-    <div class="flex items-center justify-between gap-2">
-      <h1 class="text-light text-2xl font-display font-bold">Torneos</h1>
-      <UButton
-        to="/nuevo-torneo"
-        size="sm"
-        color="secondary"
-        icon="i-lucide-plus"
-      >
-        Nuevo
-      </UButton>
-    </div>
-
-    <!-- VACIO -->
-    <section
-      v-if="!tournaments?.length"
-      class="flex flex-col items-center gap-2 bg-pingpong-900/40 rounded-2xl border border-solid border-pingpong-700/30 text-center px-6 py-10"
-    >
-      <UIcon name="i-lucide-swords" class="size-10 text-pingpong-500" />
-      <p class="text-pingpong-200 text-sm">Sin torneos todavía</p>
-      <p class="text-pingpong-400 text-xs">Creá el primero para arrancar</p>
-    </section>
-
-    <!-- EN CURSO -->
-    <section v-if="inProgress.length > 0" class="flex flex-col gap-2">
-      <h2 class="text-pingpong-200 text-xs font-semibold uppercase tracking-wider">En curso</h2>
-      <ul class="flex flex-col gap-2">
-        <li v-for="t in inProgress" :key="t.id">
-          <NuxtLink
-            :to="`/torneo/${t.id}`"
-            class="flex items-center gap-3 bg-secondary/10 rounded-2xl border border-solid border-secondary/30 active:opacity-70 transition-opacity px-4 py-3"
-          >
-            <UIcon name="i-lucide-play" class="size-5 text-secondary shrink-0" />
-            <div class="flex flex-col gap-0.5 flex-1 min-w-0">
-              <span class="text-light text-sm font-semibold truncate">{{ t.name }}</span>
-              <span class="text-pingpong-300 text-xs">
-                {{ t.players_count }} jugadores · {{ formatDate(t.created_at) }}
-              </span>
-            </div>
-            <UIcon name="i-lucide-chevron-right" class="size-4 text-pingpong-300 shrink-0" />
-          </NuxtLink>
-        </li>
-      </ul>
-    </section>
-
-    <!-- FINALIZADOS -->
-    <section v-if="finished.length > 0" class="flex flex-col gap-2">
-      <h2 class="text-pingpong-200 text-xs font-semibold uppercase tracking-wider">Finalizados</h2>
-      <ul class="flex flex-col gap-1.5 bg-pingpong-900/40 rounded-2xl border border-solid border-pingpong-700/30 p-2">
-        <li v-for="t in finished" :key="t.id">
-          <NuxtLink
-            :to="`/torneo/${t.id}`"
-            class="flex items-center gap-3 rounded-xl active:bg-pingpong-700/40 transition-colors px-3 py-2.5"
-          >
-            <UIcon name="i-lucide-trophy" class="size-4 text-secondary shrink-0" />
-            <div class="flex flex-col gap-0.5 flex-1 min-w-0">
-              <span class="text-light text-sm font-semibold truncate">{{ t.name }}</span>
-              <span class="text-pingpong-300 text-xs truncate">
-                <span v-if="t.winner_name" class="text-secondary font-semibold">{{ t.winner_name }}</span>
-                <span v-else class="italic">sin ganador</span>
-                <span class="text-pingpong-400"> · {{ formatDate(t.finished_at ?? t.created_at) }}</span>
-                <span v-if="!t.counts_for_history" class="text-pingpong-400"> · no cuenta</span>
-              </span>
-            </div>
-            <span class="font-mono-num text-pingpong-400 text-xs shrink-0">{{ t.players_count }}p</span>
-            <UIcon name="i-lucide-chevron-right" class="size-4 text-pingpong-400 shrink-0" />
-          </NuxtLink>
-        </li>
-      </ul>
-    </section>
-
-    <!-- OTROS (abandonados / setup) -->
-    <section v-if="others.length > 0" class="flex flex-col gap-2">
-      <h2 class="text-pingpong-200 text-xs font-semibold uppercase tracking-wider">Otros</h2>
-      <ul class="flex flex-col gap-1.5 bg-pingpong-900/30 rounded-2xl border border-solid border-pingpong-700/20 p-2">
-        <li v-for="t in others" :key="t.id">
-          <NuxtLink
-            :to="`/torneo/${t.id}`"
-            class="flex items-center gap-3 rounded-xl active:bg-pingpong-700/40 transition-colors px-3 py-2.5"
-          >
-            <UIcon name="i-lucide-circle-dashed" class="size-4 text-pingpong-400 shrink-0" />
-            <div class="flex flex-col gap-0.5 flex-1 min-w-0">
-              <span class="text-pingpong-200 text-sm truncate">{{ t.name }}</span>
-              <span class="text-pingpong-400 text-xs">
-                {{ t.status }} · {{ formatDate(t.created_at) }}
-              </span>
-            </div>
-            <UIcon name="i-lucide-chevron-right" class="size-4 text-pingpong-400 shrink-0" />
-          </NuxtLink>
-        </li>
-      </ul>
-    </section>
-  </div>
-</template>
